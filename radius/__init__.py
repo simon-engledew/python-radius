@@ -116,20 +116,23 @@ class Radius(object):
 
     @classmethod
     @contextmanager
-    def connect(cls, host, port, secret, timeout=3, retries=3):
+    def connect(cls, target, secret, timeout=3, retries=3):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)) as connection:
-            connection.connect((host, port))
+            connection.connect(target)
 
             yield cls(connection, secret)
 
     def ping(self):
-        return Radius.ACCESS_ACCEPT == self(
-            Packet(
-                Radius.STATUS_SERVER,
-                ord(os.urandom(1)),
-                Radius.authenticator(),
-            )
-        ).code
+        try:
+            return Radius.ACCESS_ACCEPT == self(
+                Packet(
+                    Radius.STATUS_SERVER,
+                    ord(os.urandom(1)),
+                    Radius.authenticator(),
+                )
+            ).code
+        except IOError:
+            return False
 
     def authenticate(self, username, password):
         authenticator = Radius.authenticator()
@@ -145,7 +148,7 @@ class Radius(object):
         ).code
 
     def __call__(self, outbound, timeout=3):
-        self.connection.send(outbound.pack(self.secret))
+        self.connection.sendall(outbound.pack(self.secret))
 
         r, w, x = select.select([self.connection], [], [], timeout)
 
@@ -163,3 +166,5 @@ class Radius(object):
             raise ValueError('Illegal authenticator')
 
         return inbound
+
+connect = Radius.connect
