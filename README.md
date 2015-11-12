@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/simon-engledew/python-radius.svg)](https://travis-ci.org/simon-engledew/python-radius)
+
 Python Radius is a pure python radius client which supports two important extension RFCs:
 
 ### RFC2869 / 5.14 (http://www.ietf.org/rfc/rfc2869.txt)
