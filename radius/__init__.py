@@ -102,7 +102,8 @@ class Radius(object):
     @staticmethod
     @lift(join)
     def digest(secret, authenticator, password):
-        assert len(password) <= 128, 'Password exceeds maximum length'
+        if len(password) > 128:
+          raise AssertionError('Password exceeds maximum length')
 
         previous = authenticator
         for n in xrange(0, len(password), 16):

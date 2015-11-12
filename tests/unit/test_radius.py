@@ -51,3 +51,8 @@ class TestRadius(unittest.TestCase):
 
         self.assertEqual(len(packet), 66)
         self.assertEqual(packet[0], struct.pack('!B', 1))
+
+    @with_server
+    def test_invalid_password(self, connection, result):
+        self.assertRaises(AssertionError, connection.authenticate, 'username', 'password' + ('0' * 128))
+
