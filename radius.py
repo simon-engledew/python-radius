@@ -4,18 +4,23 @@ import hashlib
 import socket
 import hmac
 import select
-import itertools
+from functools import wraps
+from itertools import zip_longest
 from contextlib import closing, contextmanager
 
+
 def join(chunks):
-    return ''.join(chunks)
+    return b''.join(chunks)
+
 
 def lift(partial):
     def decorator(fn):
+        @wraps(fn)
         def decorated(*args, **kwargs):
             return partial(fn(*args, **kwargs))
         return decorated
     return decorator
+
 
 class Pair(object):
     Head = '!B B'
@@ -39,6 +44,7 @@ class Pair(object):
     def pack(self):
         return struct.pack(Pair.Head, self.code, len(self.value) + Pair.HeadSize) + self.value
 
+
 class Packet(object):
     Head, Tail = '!B B H 16s', '!B B 16s'
     HeadSize, TailSize = struct.calcsize(Head), struct.calcsize(Tail)
@@ -52,13 +58,14 @@ class Packet(object):
     def __str__(self):
         return 'Packet({0}, id={1})[{2}]'.format(self.code, self.id, ', '.join(self.pairs))
 
-    def __len__(self):
-        return
-
     @classmethod
     def unpack(cls, secret, data):
-        code, id, length, authenticator = struct.unpack(Packet.Head, data[:Packet.HeadSize])
-        return Packet(code, *Pair.unpack(data[Packet.HeadSize:]), **{'id': id, 'authenticator': authenticator})
+        code, id, _length, authenticator = struct.unpack(Packet.Head, data[:Packet.HeadSize])
+        return Packet(
+            code,
+            *Pair.unpack(data[Packet.HeadSize:]),
+            **{'id': id, 'authenticator': authenticator}
+        )
 
     def pack(self, secret):
         pairs = join(pair.pack() for pair in self.pairs)
@@ -78,7 +85,7 @@ class Packet(object):
                 Packet.Tail,
                 Radius.MESSAGE_AUTHENTICATOR,
                 Packet.TailSize,
-                ''
+                b''
             )
         ).digest()
         return output + struct.pack(
@@ -87,6 +94,7 @@ class Packet(object):
             Packet.TailSize,
             digest
         )
+
 
 class Radius(object):
     ACCESS_REQUEST = 1
@@ -102,13 +110,19 @@ class Radius(object):
     @staticmethod
     @lift(join)
     def digest(secret, authenticator, password):
+        assert isinstance(password, (bytes, bytearray))
+
         if len(password) > 128:
-          raise AssertionError('Password exceeds maximum length')
+            raise AssertionError('Password exceeds maximum length')
 
         previous = authenticator
-        for n in xrange(0, len(password), 16):
+        for n in range(0, len(password), 16):
             digest = hashlib.md5(secret + previous).digest()
-            previous = join(chr(ord(a) ^ ord(b)) for a, b in itertools.izip_longest(digest, password[n:n + 16], fillvalue='\0'))
+            previous = bytes(
+                a ^ b
+                for a, b in
+                zip_longest(digest, password[n:n + 16], fillvalue=0)
+            )
             yield previous
 
     @staticmethod
@@ -151,7 +165,7 @@ class Radius(object):
     def __call__(self, outbound, timeout=3):
         self.connection.sendall(outbound.pack(self.secret))
 
-        r, w, x = select.select([self.connection], [], [], timeout)
+        r, _, _ = select.select([self.connection], [], [], timeout)
 
         if self.connection not in r:
             raise IOError('No response from host')
@@ -167,5 +181,6 @@ class Radius(object):
             raise ValueError('Illegal authenticator')
 
         return inbound
+
 
 connect = Radius.connect

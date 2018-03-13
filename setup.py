@@ -1,24 +1,21 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='python-radius',
-    version='1.0',
+    version='2.0',
 
     description='Pure python radius implementation which supports Message-Authenticator and Status-Server.',
     author="Simon Engledew",
     author_email="simon@engledew.com",
     url="http://www.engledew.com",
-
-    install_requires = [
-    ],
+    py_modules=['radius'],
     extras_require = {
       'tests': [
-        'nose'
+        'pytest'
       ]
     },
     zip_safe=True,
     include_package_data=False,
-    packages=find_packages(),
     license='MIT',
     keywords = [
         'radius',

@@ -7,11 +7,13 @@ import socket
 import select
 import functools
 
+
 @radius.lift(radius.join)
 def read(connection):
     while True:
-        r, w, x = select.select([connection], [], [], 0.1)
-        if connection not in r: return
+        r, _, _ = select.select([connection], [], [], 0.1)
+        if connection not in r:
+            return
         yield connection.recv(4096)
 
 
@@ -22,7 +24,7 @@ def with_server(fn):
         with closing(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)) as server:
             server.bind(('127.0.0.1', 0))
 
-            with radius.connect(server.getsockname(), 'secret') as client:
+            with radius.connect(server.getsockname(), b'secret') as client:
                 return fn(
                     self,
                     client,
@@ -38,21 +40,26 @@ class TestRadius(unittest.TestCase):
         packet = result.get(timeout=0.5)
 
         self.assertEqual(len(packet), 38)
-        self.assertEqual(packet[0], struct.pack('!B', 12))
+        self.assertEqual(packet[0], ord(struct.pack('!B', 12)))
 
     @with_server
     def test_access_accept(self, connection, result):
         try:
-            connection.authenticate('username', 'password')
+            connection.authenticate(b'username', b'password')
         except IOError:
             pass
 
         packet = result.get(timeout=0.5)
 
         self.assertEqual(len(packet), 66)
-        self.assertEqual(packet[0], struct.pack('!B', 1))
+        self.assertEqual(packet[0], ord(struct.pack('!B', 1)))
 
     @with_server
     def test_invalid_password(self, connection, result):
-        self.assertRaises(AssertionError, connection.authenticate, 'username', 'password' + ('0' * 128))
+        self.assertRaises(
+            AssertionError,
+            connection.authenticate,
+            b'username',
+            b'password' + (b'0' * 128)
+        )
 
